@@ -1,0 +1,12 @@
+model File {
+    id        Int      @id @default(autoincrement())
+    filename  String
+    url       String
+    mimetype  String?
+    size      Int?
+    userId    Int?
+    user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now())
+
+    @@map("files")
+}
