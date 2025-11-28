@@ -12,3 +12,4 @@ export class RegisterDto {
     @IsOptional()
     name?: string;
 }
+

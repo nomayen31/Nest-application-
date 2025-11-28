@@ -1,13 +1,17 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
-import bcrypt from 'node_modules/bcryptjs';
+import { LoginDto } from './dto/login.dto';
 import { UpdateUserDto } from './dto/UpdateUser.dto';
-
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AuthService {
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly jwtService: JwtService,
+    ) {}
 
     async register(registerDto: RegisterDto) {
         const { email, password, name } = registerDto;
@@ -33,9 +37,47 @@ export class AuthService {
             }
         });
 
+        // Generate JWT token
+        const token = this.generateToken(user.id, user.email);
+
         // Remove password from response
         const { password: _, ...result } = user;
-        return result;
+        
+        return {
+            user: result,
+            access_token: token,
+        };
+    }
+
+    async login(loginDto: LoginDto) {
+        const { email, password } = loginDto;
+
+        // Find user by email
+        const user = await this.prisma.user.findUnique({
+            where: { email }
+        });
+
+        if (!user) {
+            throw new UnauthorizedException('Invalid credentials');
+        }
+
+        // Verify password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+            throw new UnauthorizedException('Invalid credentials');
+        }
+
+        // Generate JWT token
+        const token = this.generateToken(user.id, user.email);
+
+        // Remove password from response
+        const { password: _, ...result } = user;
+
+        return {
+            user: result,
+            access_token: token,
+        };
     }
 
     async getAllUsers() {
@@ -130,5 +172,21 @@ export class AuthService {
         });
 
         return { message: 'User deleted successfully', id };
+    }
+
+    // Helper method to generate JWT token
+    private generateToken(userId: number, email: string): string {
+        const payload = { sub: userId, email };
+        return this.jwtService.sign(payload);
+    }
+
+    // Method to verify and decode token (useful for protected routes)
+    async validateToken(token: string) {
+        try {
+            const payload = this.jwtService.verify(token);
+            return payload;
+        } catch (error) {
+            throw new UnauthorizedException('Invalid token');
+        }
     }
 }
