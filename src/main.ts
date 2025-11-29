@@ -11,26 +11,37 @@ import helmet from 'helmet';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Basic security (optional)
+  // 🔍 TEMP DEBUG: see what Authorization header Swagger/Postman sends
+  app.use((req, _res, next) => {
+    console.log(
+      `[${req.method}] ${req.path} - Authorization:`,
+      req.headers['authorization'],
+    );
+    next();
+  });
+
+  // 🛡 Basic security
   try {
     app.use(helmet());
   } catch (err) {
-    // ignore if helmet not available
+    console.warn('Helmet not applied:', err?.message ?? err);
   }
 
-  // Enable CORS (customize origin as needed)
+  // 🌐 CORS
   app.enableCors({
-    origin: process.env.CORS_ORIGIN ?? true,
+    origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     credentials: true,
   });
 
-  // Global validation pipe
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  // ✅ Global validation
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
 
-  // Optional global prefix (uncomment / change if you want)
-  // app.setGlobalPrefix('api');
-
-  // Ensure uploads directory exists and serve it
+  // 📁 Static uploads
   const uploadDir = join(process.cwd(), 'uploads');
   if (!existsSync(uploadDir)) {
     mkdirSync(uploadDir, { recursive: true });
@@ -38,29 +49,39 @@ async function bootstrap() {
   }
   app.use('/uploads', express.static(uploadDir));
 
-  // Swagger (only non-production)
+  // 📘 Swagger (disabled in production)
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('Prisma Nest API')
       .setDescription('API docs for prisma-nest project')
       .setVersion('1.0')
       .addBearerAuth(
-        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-        'access-token',
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          in: 'header',
+        },
+        'access-token', 
       )
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api', app, document);
-    console.log('Swagger available at /api');
+    SwaggerModule.setup('api', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true, // keep token after refresh
+      },
+    });
+
+    console.log('Swagger available at http://localhost:5000/api');
   }
 
   const port = Number(process.env.PORT) || 5000;
   await app.listen(port);
-  console.log(`Server listening on port ${port}`);
+  console.log(`Server listening on http://localhost:${port}`);
 }
 
-bootstrap().catch(err => {
+bootstrap().catch((err) => {
   console.error('Bootstrap failed', err);
   process.exit(1);
 });
