@@ -1,26 +1,37 @@
 // files.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class FilesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   buildFileUrl(filename: string) {
     const base = process.env.APP_URL ?? `http://localhost:${process.env.PORT || 5000}`;
     return `${base}/uploads/${filename}`;
   }
 
-  async saveFileToDB(file: Express.Multer.File, userId?: number) {
-    return this.prisma.file.create({
+  // Helper method to transform Prisma file to DTO format
+  private transformFileToDto(file: any) {
+    return {
+      ...file,
+      createdAt: file.createdAt.toISOString(), // Convert Date to string
+    };
+  }
+
+  async saveFileToDB(file: Express.Multer.File, name: string, userId?: number, userName?: string) {
+    const created = await this.prisma.file.create({
       data: {
         filename: file.filename,
         url: this.buildFileUrl(file.filename),
         mimetype: file.mimetype,
         size: file.size,
-        userId: userId, // optional: link file to user
+        userId: userId,
+        name: name,
+        userName: userName
       },
     });
+    return this.transformFileToDto(created);
   }
 
   async attachAvatarToUser(userId: number, fileUrl: string) {
@@ -40,10 +51,11 @@ export class FilesService {
   }
 
   async getUserFiles(userId: number) {
-    return this.prisma.file.findMany({
+    const files = await this.prisma.file.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
+    return files.map(file => this.transformFileToDto(file));
   }
 
   async getFileById(id: number) {
@@ -56,10 +68,10 @@ export class FilesService {
       throw new NotFoundException(`File with ID ${id} not found`);
     }
 
-    return file;
+    return this.transformFileToDto(file);
   }
 
-  async deleteFile(id: number) {
+  async deleteFile(id: number, userId?: number) {
     const file = await this.prisma.file.findUnique({
       where: { id },
     });
@@ -68,18 +80,14 @@ export class FilesService {
       throw new NotFoundException(`File with ID ${id} not found`);
     }
 
-    // Delete from database
+    // Check ownership
+    if (userId && file.userId !== userId) {
+      throw new ForbiddenException('You can only delete your own files');
+    }
+
     await this.prisma.file.delete({
       where: { id },
     });
-
-    // Optional: Delete physical file from disk
-    // const fs = require('fs');
-    // const path = require('path');
-    // const filePath = path.join(process.cwd(), 'uploads', file.filename);
-    // if (fs.existsSync(filePath)) {
-    //   fs.unlinkSync(filePath);
-    // }
 
     return { message: 'File deleted successfully', id };
   }
