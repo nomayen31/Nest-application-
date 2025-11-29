@@ -192,7 +192,7 @@ export class FilesController {
 
     // Save the file; here we pass userId as a string in your existing code, but ideally pass number
     // (adjusted to keep your earlier change where saveFileToDB accepted string for avatar owner)
-    const saved = await this.filesService.saveFileToDB(file, id.toString());
+    const saved = await this.filesService.saveFileToDB(file, id);
     const user = await this.filesService.attachAvatarToUser(id, saved.url);
 
     return {
