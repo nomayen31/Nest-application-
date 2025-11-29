@@ -1,0 +1,15 @@
+model Email {
+  id          Int      @id @default(autoincrement())
+  to          String
+  subject     String
+  body        String   @db.Text
+  htmlBody    String?  @db.Text
+  sentAt      DateTime @default(now())
+  status      String   @default("sent") // sent, failed, pending
+  error       String?  @db.Text
+  userId      Int?     // who sent the email (admin)
+  recipientId Int?     // user who received the email
+  recipient   User?    @relation("EmailRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  
+  @@map("emails")
+}

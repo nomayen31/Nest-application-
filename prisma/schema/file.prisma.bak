@@ -5,8 +5,7 @@ model File {
   mimetype  String?
   size      Int?
   userId    Int?
-  name      String? // <- added for custom file name
-  userName  String? // <- added
+  userName  String? 
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 

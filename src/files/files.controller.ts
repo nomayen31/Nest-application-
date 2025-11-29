@@ -97,7 +97,7 @@ class StandardResponse<T> {
 @ApiTags('files')
 @Controller('files')
 export class FilesController {
-  constructor(private readonly filesService: FilesService) {}
+  constructor(private readonly filesService: FilesService) { }
 
   // ==================== PUBLIC FILE UPLOAD (now protected + saves owner) ====================
   @Post('upload')
